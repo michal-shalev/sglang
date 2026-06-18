@@ -127,3 +127,28 @@ def group_concurrent_contiguous(
     dst_groups = [g.tolist() for g in dst_groups]
 
     return src_groups, dst_groups
+
+
+def group_concurrent_contiguous_arrays(
+    src_indices: npt.NDArray[np.int32], dst_indices: npt.NDArray[np.int32]
+) -> Tuple[npt.NDArray[np.int64], npt.NDArray[np.int64], npt.NDArray[np.int64]]:
+    """Coalesce contiguous ``(src, dst)`` index pairs and return per-block
+    ``(src_starts, dst_starts, block_lens)`` as int64 arrays, without
+    materialising per-block Python lists."""
+    if src_indices.size == 0:
+        empty = np.empty(0, dtype=np.int64)
+        return empty, empty, empty
+
+    brk = np.where((np.diff(src_indices) != 1) | (np.diff(dst_indices) != 1))[0] + 1
+    starts_idx = np.empty(brk.size + 1, dtype=np.int64)
+    starts_idx[0] = 0
+    starts_idx[1:] = brk
+
+    src_starts = src_indices[starts_idx].astype(np.int64, copy=False)
+    dst_starts = dst_indices[starts_idx].astype(np.int64, copy=False)
+
+    block_lens = np.empty(starts_idx.size, dtype=np.int64)
+    block_lens[:-1] = np.diff(starts_idx)
+    block_lens[-1] = src_indices.size - starts_idx[-1]
+
+    return src_starts, dst_starts, block_lens
